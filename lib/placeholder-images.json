@@ -1,0 +1,52 @@
+{
+  "placeholderImages": [
+    {
+      "id": "user1",
+      "description": "Portrait of a smiling Nigerian man",
+      "imageUrl": "https://images.unsplash.com/photo-1723221906960-1c5a5febc9c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxuaWdlcmlhbiUyMG1hbnxlbnwwfHx8fDE3NjgzMTEyNDd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "nigerian man"
+    },
+    {
+      "id": "user2",
+      "description": "Portrait of a Nigerian woman in traditional attire",
+      "imageUrl": "https://images.unsplash.com/photo-1641932481849-9ac1cacf360c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxuaWdlcmlhbiUyMHdvbWFufGVufDB8fHx8MTc2ODMxMTI0N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "nigerian woman"
+    },
+    {
+      "id": "user3",
+      "description": "Portrait of a person in a city environment",
+      "imageUrl": "https://images.unsplash.com/photo-1707156222575-bfb9e7daa3d8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cGVyc29uJTIwY2l0eXxlbnwwfHx8fDE3NjgyNjgzNjN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person city"
+    },
+    {
+      "id": "user4",
+      "description": "Headshot of a smiling woman",
+      "imageUrl": "https://images.unsplash.com/photo-1612994451093-c6791c8989cd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxzbWlsaW5nJTIwd29tYW58ZW58MHx8fHwxNzY4MTkzNjc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "smiling woman"
+    },
+    {
+      "id": "user5",
+      "description": "Headshot of a man with glasses",
+      "imageUrl": "https://images.unsplash.com/photo-1616442690473-2ec0c452715c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2ODI5OTI5OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man glasses"
+    },
+    {
+      "id": "service1",
+      "description": "A modern storefront",
+      "imageUrl": "https://images.unsplash.com/photo-1690887824825-45c20e4d69e4?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBzdG9yZWZyb250fGVufDB8fHx8MTc2ODIzMzk3NXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "modern storefront"
+    },
+    {
+      "id": "service2",
+      "description": "A person providing a service",
+      "imageUrl": "https://images.unsplash.com/photo-1667216487856-fd318be2a7f0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxzZXJ2aWNlJTIwcGVyc29ufGVufDB8fHx8MTc2ODMxMTI0N3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "service person"
+    },
+    {
+      "id": "service3",
+      "description": "A cozy restaurant interior",
+      "imageUrl": "https://images.unsplash.com/photo-1646473315764-c6cd47fe74c3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxjb3p5JTIwcmVzdGF1cmFudHxlbnwwfHx8fDE3NjgyOTc2NjN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cozy restaurant"
+    }
+  ]
+}

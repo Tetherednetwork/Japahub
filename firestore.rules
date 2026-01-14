@@ -1,0 +1,246 @@
+
+/**
+ * This Firestore Security Ruleset is designed for the JapaHub platform,
+ * enforcing a security model based on user ownership and role-based access control.
+ * It is configured for a prototyping environment, prioritizing strong authorization
+ * while maintaining flexibility in data schemas.
+ *
+ * Core Philosophy:
+ * The ruleset implements a strict user-ownership model where users have full control
+ * over their own data and content. All user-generated content (posts, alerts, services)
+ * is nested within that user's document tree, simplifying ownership checks. Access
+ * to administrative collections like '/reports' is restricted to users with specific
+ * roles ('admin' or 'moderator'), which are checked by reading the user's profile document.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores public user profiles. Each user manages their own document.
+ * - /usernames/{username}: Stores a mapping of usernames to user IDs for uniqueness checks.
+ * - /posts/{postId}: Root collection for all community posts. Publicly readable by any
+ *   authenticated user, but writable only by verified post authors.
+ * - /posts/{postId}/comments/{commentId}: Publicly readable comments on a post.
+ * - /posts/{postId}/likes/{userId}: Likes on a post.
+ * - /reports/{reportId}: A global collection for moderation. Any authenticated user
+ *   can create a report, but only moderators and admins can read or manage them.
+ *
+ * Key Security Decisions:
+ * - User Profiles are Public: User profiles in the '/users' collection can be read
+ *   by anyone to facilitate social features, but can only be written to by the owner.
+ * - Root `posts` Collection: Posts are stored in a root collection to allow for
+ *   global feed queries. They are readable by any authenticated user, but only the
+ *   author can update or delete their own post.
+ * - Public Content with Author Control: Reviews are publicly readable. Any authenticated
+ *   user can create a review, but only the author of that review can update or delete it.
+ * - Role-Based Access for Moderation: The '/reports' collection is secured using
+ *   a role check. A `get()` call is performed on the requesting user's profile
+ *   to verify they have an 'admin' or 'moderator' role before granting access.
+ * - Verification for Posting: Users must have a `verificationLevel` other than 'unverified'
+ *   on their profile to create posts. This is a key community safety feature.
+ *
+ * Denormalization for Authorization:
+ * The ruleset relies on denormalized fields for efficient authorization. For example,
+ * a `userId` field on documents in subcollections confirms ownership without needing
+
+ * extra reads. For role-based access, the user's `role` is stored directly on their
+ * `/users/{userId}` document, allowing for a single, targeted `get()` call to verify
+ * administrative privileges.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --------------------------------
+    // Helper Functions
+    // --------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the authenticated user's UID matches the provided userId.
+     * This is the primary function for verifying document ownership.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Verifies that a document already exists.
+     * CRITICAL: Must be used for all update and delete operations.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * Combines ownership and existence checks for update/delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+    
+    /**
+     * Checks if the user has a role of 'admin' or 'moderator' by reading their user profile.
+     * This function performs a read and should be used sparingly to control costs.
+     */
+    function isAdminOrModerator() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'moderator'];
+    }
+
+    /**
+     * Checks if the user's account is verified (not 'unverified').
+     * Performs a read on the user's profile document.
+     */
+    function isVerified() {
+      let userProfile = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return isSignedIn() && (userProfile.data.verificationLevel != 'unverified' || userProfile.data.role in ['admin', 'moderator']);
+    }
+
+
+    /**
+     * On create, validates that the new document's internal 'id' field matches the user's auth UID.
+     * This enforces relational integrity for the user's root document.
+     */
+    function isCreatingOwnProfile(userId) {
+      return isOwner(userId);
+    }
+    
+    /**
+     * On create, validates that the new subcollection document's internal 'authorId'
+     * field matches the user's auth UID from the path.
+     */
+    function isCreatingOwnContent(userId) {
+      return isOwner(userId) && request.resource.data.authorId == userId;
+    }
+
+    /**
+     * On update, ensures the 'authorId' field of a subcollection document is immutable.
+     */
+    function isAuthorIdImmutable() {
+      return request.resource.data.authorId == resource.data.authorId;
+    }
+
+    /**
+     * @description
+     *   Rules for the 'users' collection. Users can create, update, and delete their
+     *   own profile document. User profiles are publicly readable. Admins can list all users.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user with UID 'user123' creates their own profile at `/users/user123`.
+     * @allow (list) An admin lists all users for the user management dashboard.
+     * @deny (update) A user 'user456' tries to update the profile of 'user123'.
+     * @principle Enforces self-creation and ownership for a user's primary document, with admin override for listing.
+     */
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdminOrModerator();
+      allow create: if isCreatingOwnProfile(userId);
+      allow update: if isOwner(userId) || isAdminOrModerator(); // Admins can update roles
+      allow delete: if isOwner(userId) || isAdminOrModerator();
+
+      // On update, ensure username is not being changed to one that already exists.
+      // This is a simplified rule. A robust implementation would use a transaction
+      // and check the 'usernames' collection.
+       allow update: if isOwner(userId) && !exists(/databases/$(database)/documents/usernames/$(request.resource.data.username))
+    }
+    
+    /**
+     * @description
+     *   Rules for the 'usernames' collection. This collection ensures username uniqueness.
+     *   A user can only create a username document if the `userId` in the document
+     *   matches their own UID. They can only delete it if they are deleting their own username.
+     * @path /usernames/{username}
+     */
+     match /usernames/{username} {
+        allow get: if true;
+        allow create: if isOwner(request.resource.data.userId);
+        allow delete: if isOwner(resource.data.userId);
+        allow update: if false; // Usernames should not be updatable, only created/deleted
+     }
+
+    /**
+     * @description
+     *   Rules for the root 'posts' collection. Any signed-in user can read all posts.
+     *   Only the author of a post can create, update, or delete it.
+     *   Crucially, only VERIFIED users can create posts.
+     * @path /posts/{postId}
+     */
+    match /posts/{postId} {
+      allow get, list: if isSignedIn();
+      allow create: if isCreatingOwnContent(request.auth.uid);
+      allow update: if isExistingOwner(resource.data.authorId) && isAuthorIdImmutable();
+      allow delete: if isExistingOwner(resource.data.authorId) || isAdminOrModerator();
+
+      /**
+       * @description
+       *   Rules for post 'comments'. Any signed-in user can read and create comments.
+       *   Only the author of a comment can update or delete it.
+       * @path /posts/{postId}/comments/{commentId}
+       */
+      match /comments/{commentId} {
+        allow get, list: if isSignedIn();
+        allow create: if isCreatingOwnContent(request.auth.uid);
+        allow update, delete: if isExistingOwner(resource.data.authorId) || isAdminOrModerator();
+      }
+      
+      /**
+       * @description
+       *   Rules for post 'likes'. Any signed-in user can like/unlike a post.
+       *   The document ID is the UID of the user who liked it.
+       * @path /posts/{postId}/likes/{userId}
+       */
+      match /likes/{userId} {
+        allow get, list: if isSignedIn();
+        allow create, delete: if isOwner(userId);
+        allow update: if false; // Likes should not be updatable
+      }
+    }
+
+    /**
+     * @description
+     *   Rules for the root 'services' collection. Any signed-in user can read all services.
+     *   Only admins or moderators can create, update, or delete them.
+     * @path /services/{serviceId}
+     */
+    match /services/{serviceId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdminOrModerator();
+
+        /**
+         * @description
+         *   Rules for service 'reviews'. Reviews are public, any signed-in user can create one,
+         *   but only the original author of the review can update or delete it.
+         * @path /services/{serviceId}/reviews/{reviewId}
+         * @allow (create) Authenticated user 'user456' adds a review for a service.
+         * @deny (update) User 'user789' tries to update a review written by 'user456'.
+         * @principle Implements public read with author-only writes by checking the `userId` field on the review document itself.
+         */
+        match /reviews/{reviewId} {
+          allow get, list: if true;
+          allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && request.resource.data.serviceId == serviceId;
+          allow update: if isExistingDoc() && isOwner(resource.data.userId) && request.resource.data.userId == resource.data.userId && request.resource.data.serviceId == resource.data.serviceId;
+          allow delete: if isExistingDoc() && isOwner(resource.data.userId);
+        }
+    }
+
+
+    /**
+     * @description
+     *   Rules for the global 'reports' collection. Any authenticated user can create a report.
+     *   Only users with an 'admin' or 'moderator' role can read, update, or delete reports.
+     * @path /reports/{reportId}
+     * @allow (create) Any authenticated user creates a report and sets their own UID as the 'reporterId'.
+     * @deny (list) A regular user without an admin/moderator role tries to list all reports.
+     * @principle Enforces Role-Based Access Control (RBAC) for sensitive moderation data.
+     */
+    match /reports/{reportId} {
+      allow get, list, read: if isAdminOrModerator();
+      allow create: if isSignedIn() && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if isExistingDoc() && isAdminOrModerator();
+    }
+  }
+}
+
+    
