@@ -159,42 +159,46 @@ export function EditProfileSheet({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="country"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Country</FormLabel>
-                  <CountrySelect
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      form.setValue('city', ''); // Reset city when country changes
-                    }}
-                    defaultValue={field.value}
-                    value={field.value}
-                  />
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="city"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>City</FormLabel>
-                  <FormControl>
-                    <CityCombobox
-                      countryCode={selectedCountryCode}
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={!selectedCountryCode || isSubmitting}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="country"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Country</FormLabel>
+                    <FormControl>
+                      <CountrySelect
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          form.setValue('city', ''); // Reset city when country changes
+                        }}
+                        defaultValue={field.value}
+                        value={field.value}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <CityCombobox
+                        countryCode={selectedCountryCode}
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={!selectedCountryCode || isSubmitting}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <SheetFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
                 Cancel
