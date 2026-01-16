@@ -1,99 +1,100 @@
-
 'use server';
-/**
- * @fileOverview A flow for fetching news articles from the GNews API.
- * 
- * - fetchNews - A function that retrieves news based on a query.
- * - FetchNewsInput - The input type for the fetchNews function.
- * - FetchNewsOutput - The return type for the fetchNews function.
- */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import fetch from 'node-fetch';
+import Parser from 'rss-parser';
+
+// Define schemas
+const FetchNewsInputSchema = z.object({
+    query: z.string().optional().describe('A keyword or topic to search for (e.g., "technology", "finance").'),
+    country: z.string().optional().describe('The 2-letter country code to focus on (e.g., "us", "ng", "gb").'),
+    category: z.string().optional().describe('The category of news (e.g., "business", "technology", "sports").'),
+    language: z.string().optional().describe('The language of the news (e.g., "en", "fr").'),
+});
+
+export type FetchNewsInput = z.infer<typeof FetchNewsInputSchema>;
 
 const ArticleSchema = z.object({
     title: z.string(),
     description: z.string(),
     content: z.string(),
-    url: z.string().url(),
-    image: z.string().url(),
+    url: z.string(),
+    image: z.string(),
     publishedAt: z.string(),
     source: z.object({
         name: z.string(),
-        url: z.string().url(),
-    }),
+        url: z.string(),
+    })
 });
+
 export type Article = z.infer<typeof ArticleSchema>;
 
-const FetchNewsInputSchema = z.object({
-    query: z.string().describe('The search query for news articles (e.g., "Nigeria", "London tech").'),
-    category: z.string().optional().describe('The category of news (e.g., "general", "business", "technology", "politics").'),
-    country: z.string().optional().describe('The 2-letter ISO 3166-1 code of the country (e.g., "gb", "ng").'),
-    language: z.string().optional().default('en').describe('The language of the news articles.'),
-});
-export type FetchNewsInput = z.input<typeof FetchNewsInputSchema>;
+const parser = new Parser();
 
-const FetchNewsOutputSchema = z.array(ArticleSchema);
-export type FetchNewsOutput = z.infer<typeof FetchNewsOutputSchema>;
+// Helper to get Google New RSS URL
+function getGoogleNewsRssUrl(input: FetchNewsInput): string {
+    const lang = input.language || 'en';
+    const country = (input.country || 'gb').toUpperCase(); // Default to UK if not specified? Or US.
+    const ceid = `${country}:${lang}`;
 
-const fetchNewsFromGNews = ai.defineTool(
+    let baseUrl = 'https://news.google.com/rss';
+
+    if (input.query) {
+        // Search query
+        return `${baseUrl}/search?q=${encodeURIComponent(input.query + (input.category ? ` ${input.category}` : ''))}&hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    } else if (input.category) {
+        // Topic (Note: Google News usage of topics in RSS is non-standard, better to search)
+        // Mapping common categories to search terms often works better reliably
+        return `${baseUrl}/search?q=${encodeURIComponent(input.category)}&hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    } else {
+        // Top headlines for country
+        return `${baseUrl}?hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    }
+}
+
+const fetchNewsTool = ai.defineTool(
     {
-        name: 'fetchNewsFromGNews',
-        description: 'Fetches news articles from the GNews API.',
+        name: 'fetchNews',
+        description: 'Fetches news articles from Google News RSS feeds. Reliable and free.',
         inputSchema: FetchNewsInputSchema,
-        outputSchema: FetchNewsOutputSchema,
+        outputSchema: z.array(ArticleSchema),
     },
     async (input) => {
-        const apiKey = process.env.GNEWS_API_KEY;
-        if (!apiKey) {
-            console.error('GNEWS_API_KEY environment variable not set.');
-            throw new Error('GNews API Key is missing on server.');
-        }
-
-        const url = 'https://gnews.io/api/v4/top-headlines';
-        const params = new URLSearchParams({
-            apikey: apiKey,
-            lang: input.language || 'en',
-        });
-
-        if (input.query) params.append('q', input.query);
-        if (input.country) params.append('country', input.country);
-        if (input.category && ['general', 'world', 'nation', 'business', 'technology', 'entertainment', 'sports', 'science', 'health', 'politics'].includes(input.category)) {
-            params.append('topic', input.category);
-        }
-
         try {
-            const response = await fetch(`${url}?${params.toString()}`);
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`GNews API Error (${response.status}): ${errorBody}`);
+            const feedUrl = getGoogleNewsRssUrl(input);
+            console.log(`Fetching RSS from: ${feedUrl}`);
+
+            const feed = await parser.parseURL(feedUrl);
+
+            if (!feed.items || feed.items.length === 0) {
+                return [];
             }
-            const data: any = await response.json();
 
-            // Filter and map articles
-            const validArticles = (data.articles || [])
-                .map((article: any) => {
-                    return {
-                        title: article.title,
-                        description: article.description || '',
-                        content: article.content || '',
-                        url: article.url,
-                        image: article.image || '',
-                        publishedAt: article.publishedAt,
-                        source: {
-                            name: article.source.name,
-                            url: article.source.url,
-                        }
-                    };
-                })
-                .filter((article: any) => article.title && article.url);
+            return feed.items.map((item) => {
+                // RSS items often don't have images directly in standard fields, 
+                // but we can try to extract or use a placeholder.
+                // Google News RSS description often contains HTMLTables.
 
-            return validArticles;
+                // Use a generic placeholder if we can't find one.
+                const image = 'https://placehold.co/600x400/e2e8f0/1e293b?text=News';
+
+                return {
+                    title: item.title || 'Untitled',
+                    description: item.contentSnippet || item.content || '',
+                    content: item.content || item.contentSnippet || '',
+                    url: item.link || '',
+                    image: image,
+                    publishedAt: item.isoDate || new Date().toISOString(),
+                    source: {
+                        name: item.source || 'Google News',
+                        url: item.link || '',
+                    }
+                };
+            }).slice(0, 10); // Limit to 10 items
 
         } catch (error) {
-            console.error('Error fetching news from GNews API:', error);
-            throw error;
+            console.error("RSS Fetch Error:", error);
+            throw new Error(`Failed to fetch news feed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 );
@@ -109,10 +110,10 @@ const fetchNewsFlow = ai.defineFlow(
     },
     async (input) => {
         try {
-            const articles = await fetchNewsFromGNews(input);
+            const articles = await fetchNewsTool(input);
             return { articles };
         } catch (e: any) {
-            console.error("News fetch error:", e);
+            console.error("News fetch flow error:", e);
             return { articles: [], error: e.message || "Unknown error fetching news" };
         }
     }
