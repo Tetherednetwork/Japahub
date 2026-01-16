@@ -20,17 +20,17 @@ export type SearchLocalDirectoryInput = z.infer<typeof SearchLocalDirectoryInput
 
 // Define a schema for a single place result from the Google Places API
 const PlaceSchema = z.object({
-    id: z.string(),
-    name: z.string(),
-    category: z.string(),
-    description: z.string(),
-    imageUrl: z.string().optional(),
-    rating: z.number().default(0),
-    reviewCount: z.number().default(0),
-    isVerified: z.boolean().default(false),
-    phone: z.string().optional(),
-    website: z.string().optional(),
-    address: z.string().optional(),
+  id: z.string(),
+  name: z.string(),
+  category: z.string(),
+  description: z.string(),
+  imageUrl: z.string().optional(),
+  rating: z.number().default(0),
+  reviewCount: z.number().default(0),
+  isVerified: z.boolean().default(false),
+  phone: z.string().optional(),
+  website: z.string().optional(),
+  address: z.string().optional(),
 });
 
 const SearchLocalDirectoryOutputSchema = z.array(PlaceSchema);
@@ -48,8 +48,8 @@ const findPlacesTool = ai.defineTool(
     console.log(`Searching for ${query} in ${location}`);
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
-      console.warn('GOOGLE_PLACES_API_KEY environment variable not set. Please set it in your .env file.');
-      throw new Error('The Google Places API key is not configured. Please set the GOOGLE_PLACES_API_KEY environment variable.');
+      console.error('GOOGLE_PLACES_API_KEY environment variable not set.');
+      return []; // Prevent crash
     }
 
     const fullQuery = `${query} in ${location}`;
@@ -71,37 +71,35 @@ const findPlacesTool = ai.defineTool(
 
       if (!response.ok) {
         const errorBody = await response.text();
-        throw new Error(`Google Places API request failed with status ${response.status}: ${errorBody}`);
+        console.error(`Google Places API request failed: ${response.status} ${errorBody}`);
+        return [];
       }
 
       const data: any = await response.json();
       if (!data.places) {
         return [];
       }
-      
+
       const services: Service[] = data.places.map((place: any) => {
-        
+
         let imageUrl = `https://picsum.photos/seed/${place.id}/400/300`; // Default placeholder
-        if(place.photos && place.photos.length > 0) {
-            // Construct the photo URL
-            // The photo reference is `places/{place_id}/photos/{photo_reference}`
-            // We need to pass this to the photo API endpoint
-            const photoName = place.photos[0].name;
-            imageUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&key=${apiKey}`;
+        if (place.photos && place.photos.length > 0) {
+          const photoName = place.photos[0].name;
+          imageUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&key=${apiKey}`;
         }
-        
+
         return {
-            id: `gen_${place.id}`, // Prefix to distinguish from internal IDs
-            name: place.displayName?.text || 'Unknown Name',
-            category: place.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, (l:string) => l.toUpperCase()) || 'Service',
-            description: `Located at ${place.formattedAddress || 'an undisclosed location'}.`,
-            imageUrl: imageUrl,
-            rating: place.rating || 0,
-            reviewCount: place.userRatingCount || 0,
-            isVerified: false, // Google Places results are not verified by our system by default
-            phone: place.nationalPhoneNumber,
-            website: place.websiteUri,
-            address: place.formattedAddress,
+          id: `gen_${place.id}`,
+          name: place.displayName?.text || 'Unknown Name',
+          category: place.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Service',
+          description: `Located at ${place.formattedAddress || 'an undisclosed location'}.`,
+          imageUrl: imageUrl,
+          rating: place.rating || 0,
+          reviewCount: place.userRatingCount || 0,
+          isVerified: false,
+          phone: place.nationalPhoneNumber,
+          website: place.websiteUri,
+          address: place.formattedAddress,
         }
       });
 
@@ -109,8 +107,7 @@ const findPlacesTool = ai.defineTool(
 
     } catch (error) {
       console.error('Error calling Google Places API:', error);
-      // Re-throw the error so it can be caught by the client
-      throw error;
+      return [];
     }
   }
 );
@@ -123,7 +120,7 @@ const searchLocalDirectoryFlow = ai.defineFlow(
     outputSchema: SearchLocalDirectoryOutputSchema,
   },
   async (input) => {
-     // Directly call the tool. No complex prompting needed for this use case.
+    // Directly call the tool. No complex prompting needed for this use case.
     return findPlacesTool(input);
   }
 );

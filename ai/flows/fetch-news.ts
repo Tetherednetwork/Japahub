@@ -47,8 +47,8 @@ const fetchNewsFromGNews = ai.defineTool(
     async (input) => {
         const apiKey = process.env.GNEWS_API_KEY;
         if (!apiKey) {
-            console.warn('GNEWS_API_KEY environment variable not set. Please set it in your .env file.');
-            throw new Error('The GNews API key is not configured.');
+            console.error('GNEWS_API_KEY environment variable not set.');
+            return []; // Return empty array instead of throwing to prevent UI crash
         }
 
         const url = 'https://gnews.io/api/v4/top-headlines';
@@ -66,20 +66,21 @@ const fetchNewsFromGNews = ai.defineTool(
         try {
             const response = await fetch(`${url}?${params.toString()}`);
             if (!response.ok) {
-                const errorBody = await response.json() as any;
-                throw new Error(`GNews API request failed with status ${response.status}: ${errorBody.errors.join(', ')}`);
+                const errorBody = await response.text();
+                console.error(`GNews API request failed: ${response.status} ${errorBody}`);
+                return [];
             }
             const data: any = await response.json();
 
             // Filter and map articles to our schema, ensuring all required fields are present and valid
-            const validArticles = data.articles
+            const validArticles = (data.articles || [])
                 .map((article: any) => {
                     return {
                         title: article.title,
-                        description: article.description,
-                        content: article.content,
+                        description: article.description || '', // Ensure strings
+                        content: article.content || '',
                         url: article.url,
-                        image: article.image,
+                        image: article.image || '',
                         publishedAt: article.publishedAt,
                         source: {
                             name: article.source.name,
@@ -88,15 +89,15 @@ const fetchNewsFromGNews = ai.defineTool(
                     };
                 })
                 .filter((article: any) => {
-                    const result = ArticleSchema.safeParse(article);
-                    return result.success;
+                    // Basic validation manually since zod might be too strict on empty strings
+                    return article.title && article.url;
                 });
 
             return validArticles;
 
         } catch (error) {
             console.error('Error fetching news from GNews API:', error);
-            throw error;
+            return [];
         }
     }
 );
