@@ -1,4 +1,11 @@
 'use server';
+/**
+ * @fileOverview A flow for searching a local business directory using the Google Places API.
+ *
+ * - searchLocalDirectory - A function that searches for local businesses.
+ * - SearchLocalDirectoryInput - The input type for the searchLocalDirectory function.
+ * - SearchLocalDirectoryOutput - The return type for the searchLocalDirectory function.
+ */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
@@ -11,6 +18,7 @@ const SearchLocalDirectoryInputSchema = z.object({
 });
 export type SearchLocalDirectoryInput = z.infer<typeof SearchLocalDirectoryInputSchema>;
 
+// Define a schema for a single place result from the Google Places API
 const PlaceSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -32,64 +40,77 @@ export type SearchLocalDirectoryOutput = z.infer<typeof SearchLocalDirectoryOutp
 const findPlacesTool = ai.defineTool(
   {
     name: 'findPlaces',
-    description: 'Finds places based on a query and location using OpenStreetMap Nominatim API. Free and reliable.',
+    description: 'Finds places based on a query and location using Google Places API.',
     inputSchema: SearchLocalDirectoryInputSchema,
     outputSchema: SearchLocalDirectoryOutputSchema,
   },
   async ({ query, location }) => {
-    console.log(`Searching for ${query} in ${location} via Nominatim`);
+    console.log(`[findPlaces] Searching for ${query} in ${location}`);
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    console.log(`[findPlaces] Using API Key (length): ${apiKey ? apiKey.length : 0}`);
 
-    // Nominatim URL
+    if (!apiKey) {
+      console.error('GOOGLE_PLACES_API_KEY environment variable not set.');
+      throw new Error('Google Places API Key is missing on server.');
+    }
+
     const fullQuery = `${query} in ${location}`;
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullQuery)}&format=json&addressdetails=1&limit=12&extratags=1`;
+    const url = `https://places.googleapis.com/v1/places:searchText`;
 
     try {
       const response = await fetch(url, {
+        method: 'POST',
         headers: {
-          'User-Agent': 'JapaHub/1.0 (japahub@example.com)' // Nominatim requires a User-Agent
-        }
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.types,places.id,places.photos',
+        },
+        body: JSON.stringify({
+          textQuery: fullQuery,
+          maxResultCount: 12,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error(`Nominatim API Error: ${response.status}`);
+        const errorBody = await response.text();
+        console.error(`[findPlaces] API Error ${response.status}: ${errorBody}`);
+        throw new Error(`Google Places API Error (${response.status}): ${errorBody}`);
       }
 
-      const places: any[] = await response.json();
-
-      if (!places || !Array.isArray(places)) {
+      const data: any = await response.json();
+      if (!data.places) {
+        console.log('[findPlaces] No places found in response.');
         return [];
       }
 
-      const services: Service[] = places.map((place: any) => {
-        // Nominatim returns simplified data compared to Google, so we map carefully.
-        const name = place.name || place.display_name.split(',')[0];
-        const category = place.type ? place.type.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) : 'Service';
+      const services: Service[] = data.places.map((place: any) => {
 
-        // Nominatim doesn't provide images or ratings usually.
-        // We use a placeholder based on ID.
-        const imageUrl = `https://picsum.photos/seed/${place.place_id}/400/300`;
+        let imageUrl = `https://picsum.photos/seed/${place.id}/400/300`; // Default placeholder
+        if (place.photos && place.photos.length > 0) {
+          const photoName = place.photos[0].name;
+          imageUrl = `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=400&key=${apiKey}`;
+        }
 
         return {
-          id: `osm_${place.place_id}`,
-          name: name,
-          category: category,
-          description: place.display_name || `Located at ${name}`,
+          id: `gen_${place.id}`,
+          name: place.displayName?.text || 'Unknown Name',
+          category: place.types?.[0]?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Service',
+          description: `Located at ${place.formattedAddress || 'an undisclosed location'}.`,
           imageUrl: imageUrl,
-          rating: 0, // Not available in basic Nominatim
-          reviewCount: 0,
+          rating: place.rating || 0,
+          reviewCount: place.userRatingCount || 0,
           isVerified: false,
-          // Phone and website are in extratags if available
-          phone: place.extratags?.phone || place.extratags?.['contact:phone'],
-          website: place.extratags?.website || place.extratags?.['contact:website'],
-          address: place.display_name,
+          phone: place.nationalPhoneNumber,
+          website: place.websiteUri,
+          address: place.formattedAddress,
         }
       });
 
       return services;
 
     } catch (error) {
-      console.error('Error calling Nominatim API:', error);
-      throw new Error(`Failed to search directory: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('[findPlaces] Network/Code Error:', error);
+      throw error;
     }
   }
 );
