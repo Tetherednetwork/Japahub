@@ -195,12 +195,20 @@ export function NewPost() {
         mediaFiles.map(async (media) => {
           const path = `posts/${user.uid}/${Date.now()}_${media.file.name}`;
           let url: string;
-          if (media.type === 'image') {
-            url = await uploadImage(media.file, path);
-          } else {
-            url = await uploadVideo(media.file, path);
+
+          const timeout = (ms: number) => new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Upload timed out - check your connection")), ms));
+
+          try {
+            if (media.type === 'image') {
+              url = await Promise.race([uploadImage(media.file, path), timeout(30000)]);
+            } else {
+              url = await Promise.race([uploadVideo(media.file, path), timeout(60000)]);
+            }
+            return { url, type: media.type };
+          } catch (err) {
+            console.error("Upload failed for file:", media.file.name, err);
+            throw err; // Re-throw to be caught by the outer try-catch
           }
-          return { url, type: media.type };
         })
       );
 
