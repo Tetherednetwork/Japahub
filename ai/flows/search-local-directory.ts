@@ -10,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import type { Service } from '@/lib/types';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch'; // Removed to use native global fetch
 
 const SearchLocalDirectoryInputSchema = z.object({
   query: z.string().describe('The search query for the business or service (e.g., "restaurants", "plumbers").'),

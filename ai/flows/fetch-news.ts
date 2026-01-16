@@ -2,7 +2,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch'; // Removed to use native global fetch
 
 // Define schemas
 const FetchNewsInputSchema = z.object({
