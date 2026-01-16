@@ -129,8 +129,8 @@ function LoginPageContent() {
     <div className="w-full min-h-screen lg:grid lg:grid-cols-2">
       <div className="relative hidden lg:flex flex-col items-center justify-between bg-gray-800 text-white p-10 text-center">
         <Image
-          src="https://picsum.photos/seed/loginfashion/1080/1920"
-          alt="Woman in traditional Nigerian attire"
+          src="/login-bg.jpg"
+          alt="Friends laughing together"
           fill
           priority
           sizes="50vw"
@@ -180,7 +180,7 @@ function LoginPageContent() {
       </div>
       <div className="relative flex items-center justify-center p-6 sm:p-12">
         <Image
-          src="https://picsum.photos/seed/loginpattern/1080/1920"
+          src="/login-pattern.jpg"
           alt="Green abstract pattern"
           fill
           priority
