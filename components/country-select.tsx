@@ -43,6 +43,7 @@ export function CountrySelect({ onValueChange, value, disabled }: CountrySelectP
       notFoundText="No country found."
       triggerContent={selectedLabel}
       disabled={disabled}
+      triggerClassName="w-full"
     />
   );
 }
