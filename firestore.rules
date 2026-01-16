@@ -171,7 +171,8 @@ service cloud.firestore {
     match /posts/{postId} {
       allow get, list: if isSignedIn();
       allow create: if isCreatingOwnContent(request.auth.uid);
-      allow update: if isExistingOwner(resource.data.authorId) && isAuthorIdImmutable();
+      allow update: if (isExistingOwner(resource.data.authorId) && isAuthorIdImmutable()) || 
+                    (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentCount', 'likeCount']));
       allow delete: if isExistingOwner(resource.data.authorId) || isAdminOrModerator();
 
       /**
