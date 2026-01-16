@@ -140,10 +140,11 @@ service cloud.firestore {
       allow update: if isOwner(userId) || isAdminOrModerator(); // Admins can update roles
       allow delete: if isOwner(userId) || isAdminOrModerator();
 
-      // On update, ensure username is not being changed to one that already exists.
-      // This is a simplified rule. A robust implementation would use a transaction
-      // and check the 'usernames' collection.
-       allow update: if isOwner(userId) && !exists(/databases/$(database)/documents/usernames/$(request.resource.data.username))
+      // On update, ensure username is unique ONLY if it is being changed.
+       allow update: if isOwner(userId) && (
+          request.resource.data.username == resource.data.username || 
+          !exists(/databases/$(database)/documents/usernames/$(request.resource.data.username))
+       );
     }
     
     /**

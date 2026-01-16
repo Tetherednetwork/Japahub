@@ -4,8 +4,8 @@
 // copy the contents of this file, paste it into the console, and press Enter.
 // Then, type `await seedServices()` into the console and press Enter.
 
-import { collection, writeBatch, getFirestore, doc } from 'firebase/firestore';
-import { initializeFirebase } from '../firebase';
+import { collection, writeBatch, getFirestore, doc, updateDoc } from 'firebase/firestore';
+import { initializeFirebase } from '../firebase/init';
 
 const sampleServices = [
     {
@@ -101,7 +101,28 @@ export async function seedServices() {
     }
 }
 
+export async function promoteMeToAdmin() {
+    try {
+        const { firestore, auth } = initializeFirebase();
+        if (!auth.currentUser) {
+            console.error("No user is currently signed in. Please sign in first.");
+            alert("No user is currently signed in. Please sign in first.");
+            return;
+        }
+
+        const userRef = doc(firestore, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, { role: 'admin' });
+
+        console.log(`Successfully promoted ${auth.currentUser.email} to admin.`);
+        alert(`Success! You differnece now an admin. Navigate to /admin to access the dashboard.`);
+    } catch (error) {
+        console.error("Error promoting user:", error);
+        alert("Error promoting user. See console.");
+    }
+}
+
 // Make the function available globally for console access
 if (typeof window !== 'undefined') {
     (window as any).seedServices = seedServices;
+    (window as any).promoteMeToAdmin = promoteMeToAdmin;
 }

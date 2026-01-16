@@ -17,9 +17,18 @@ const nextConfig = {
             {
                 protocol: 'https',
                 hostname: 'graph.facebook.com',
+            },
+            {
+                protocol: 'https',
+                hostname: 'picsum.photos',
+            },
+            {
+                protocol: 'https',
+                hostname: 'ichef.bbci.co.uk',
             }
         ],
     },
+    output: 'standalone',
 };
 
 export default nextConfig;

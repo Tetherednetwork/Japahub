@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase/provider';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { addDoc, collection, Timestamp, doc } from 'firebase/firestore';
+import { addDoc, collection, Timestamp, doc, serverTimestamp } from 'firebase/firestore';
 import { Paperclip, Image as ImageIcon, MapPin, Mic, Loader2, X, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { UserProfile } from '@/lib/types';
@@ -16,6 +16,7 @@ import { uploadImage, uploadVideo } from '@/firebase/storage';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function RecordVideoDialog({ isOpen, onOpenChange, onVideoRecorded }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onVideoRecorded: (file: File) => void }) {
   const { toast } = useToast();
@@ -140,6 +141,7 @@ export function NewPost() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [content, setContent] = useState('');
+  const [category, setCategory] = useState('general');
   const [isLoading, setIsLoading] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -207,13 +209,16 @@ export function NewPost() {
         authorId: user.uid,
         content,
         media: uploadedMedia,
-        category: 'general',
-        createdAt: new Timestamp(Math.floor(Date.now() / 1000), 0),
+        category: category,
+        createdAt: serverTimestamp(),
         likeCount: 0,
         commentCount: 0,
+        city: userProfile?.city,
+        country: userProfile?.country
       });
 
       setContent('');
+      setCategory('general');
       setMediaFiles([]);
 
       toast({
@@ -221,10 +226,19 @@ export function NewPost() {
         description: 'Your post is now live for the community to see.',
       });
     } catch (error: any) {
+      console.error("Error creating post:", error);
+      let errorMessage = "Failed to create post. Please try again.";
+
+      if (error.code === 'permission-denied') {
+        errorMessage = "You do not have permission to post. Please ensure your account is verified.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       toast({
         variant: 'destructive',
         title: 'Error creating post',
-        description: error.message,
+        description: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -285,24 +299,30 @@ export function NewPost() {
                     <Video className="h-5 w-5" />
                     <span className="sr-only">Record Video</span>
                   </Button>
+                </div>
 
-                  <Button variant="ghost" size="icon" className="h-9 w-9" disabled>
-                    <Paperclip className="h-5 w-5" />
-                    <span className="sr-only">Add Attachment</span>
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9" disabled>
-                    <MapPin className="h-5 w-5" />
-                    <span className="sr-only">Add Location</span>
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-9 w-9" disabled>
-                    <Mic className="h-5 w-5" />
-                    <span className="sr-only">Add Voice Note</span>
+                <div className="flex items-center gap-2">
+                  <div className="w-[120px]">
+                    <Select value={category} onValueChange={setCategory}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="general">General</SelectItem>
+                        <SelectItem value="job">Job</SelectItem>
+                        <SelectItem value="housing">Housing</SelectItem>
+                        <SelectItem value="event">Event</SelectItem>
+                        <SelectItem value="alert">Alert</SelectItem>
+                        <SelectItem value="service">Service</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <Button className="rounded-full" onClick={handlePost} disabled={isLoading || (!content.trim() && mediaFiles.length === 0)}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Post
                   </Button>
                 </div>
-                <Button className="rounded-full" onClick={handlePost} disabled={isLoading || (!content.trim() && mediaFiles.length === 0)}>
-                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Post
-                </Button>
               </div>
             </div>
           </div>

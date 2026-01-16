@@ -33,6 +33,7 @@ import type { Post as PostType, Like, Comment, UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import {
+
   doc,
   collection,
   deleteDoc,
@@ -43,11 +44,12 @@ import {
   orderBy,
   addDoc,
   getDoc,
+  where,
 } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getCountryFlag } from '@/lib/countries';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -484,6 +486,8 @@ export default function CommunityFeedPage() {
   const { user, isUserLoading: userLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'all';
 
   useEffect(() => {
     if (!userLoading && !user) {
@@ -491,11 +495,42 @@ export default function CommunityFeedPage() {
     }
   }, [user, userLoading, router]);
 
+  // Fetch user profile for location-based filtering
+  const userProfileRef = useMemoFirebase(() => (user ? doc(firestore, `users/${user.uid}`) : null), [user, firestore]);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
   // Only create the query if the user is logged in
   const postsQuery = useMemoFirebase(() => {
     if (!user || !firestore) return null;
-    return query(collection(firestore, 'posts'), orderBy('createdAt', 'desc'));
-  }, [firestore, user]);
+
+    const postsRef = collection(firestore, 'posts');
+    // Default constraints: Sort by creation time
+    const constraints: any[] = [orderBy('createdAt', 'desc')];
+
+    // 1. FILTER BY LOCATION (The "Nextdoor" Feature)
+    // If the user has a city set, only show posts from that city.
+    // We add this filter BEFORE the category filter.
+    if (userProfile?.city && userProfile?.country) {
+      constraints.unshift(where('city', '==', userProfile.city));
+    }
+
+    // 2. FILTER BY CATEGORY (Tabs)
+    // Map tabs to categories
+    const categoryMap: Record<string, string> = {
+      'job': 'job',
+      'housing': 'housing',
+      'service': 'service',
+      'event': 'event',
+      'poll': 'poll',
+      'alert': 'alert'
+    };
+
+    if (activeTab !== 'all' && categoryMap[activeTab]) {
+      constraints.unshift(where('category', '==', categoryMap[activeTab]));
+    }
+
+    return query(postsRef, ...constraints);
+  }, [firestore, user, activeTab, userProfile]);
 
   const { data: posts, isLoading: postsLoading } = useCollection<PostType>(postsQuery);
 

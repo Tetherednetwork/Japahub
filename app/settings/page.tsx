@@ -17,6 +17,8 @@ import type { UserProfile } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, ShieldCheck, ShieldAlert, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CityCombobox } from "@/components/city-combobox";
+import { CountrySelect } from "@/components/country-select";
 
 function VerificationStatusBadge({ level }: { level: UserProfile['verificationLevel'] }) {
     switch (level) {
@@ -148,6 +150,41 @@ function SettingsPageContent({ authUser }: { authUser: NonNullable<ReturnType<ty
 
             <Card>
                 <CardHeader>
+                    <CardTitle>Location Settings</CardTitle>
+                    <CardDescription>Update your home location to see relevant content in your feed.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="rounded-lg border p-4 space-y-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="country-select">Country</Label>
+                            <CountrySelect
+                                value={userProfile?.country}
+                                onValueChange={async (val) => {
+                                    if (!userProfileRef) return;
+                                    await updateDoc(userProfileRef, { country: val, city: '' }); // Reset city on country change
+                                    toast({ title: "Location Updated", description: "Country updated successfully." });
+                                }}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="city-combobox">City</Label>
+                            <CityCombobox
+                                countryCode={userProfile?.country}
+                                value={userProfile?.city}
+                                onValueChange={async (val) => {
+                                    if (!userProfileRef) return;
+                                    await updateDoc(userProfileRef, { city: val });
+                                    toast({ title: "Location Updated", description: "City updated successfully. Your feed will now show posts from this city." });
+                                }}
+                                disabled={!userProfile?.country}
+                            />
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
                     <CardTitle>Notifications</CardTitle>
                     <CardDescription>Choose what you want to be notified about.</CardDescription>
                 </CardHeader>
@@ -195,7 +232,7 @@ function SettingsPageContent({ authUser }: { authUser: NonNullable<ReturnType<ty
                     <Button variant="destructive" disabled>Delete Account</Button>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }
 

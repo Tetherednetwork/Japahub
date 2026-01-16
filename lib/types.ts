@@ -14,7 +14,7 @@ export type UserProfile = {
   createdAt: Timestamp;
   role: 'user' | 'moderator' | 'admin';
   city: string;
-  country: string; 
+  country: string;
   verificationLevel: 'unverified' | 'phone' | 'id';
   lastKnownIp?: string;
   phoneNumber: string;
@@ -40,24 +40,26 @@ export type Post = {
   media?: PostMedia[];
   alertType?: AlertType;
   location?: string;
+  city?: string;
+  country?: string;
   voiceNoteUrl?: string;
 };
 
 export type Comment = {
-    id: string;
-    authorId: string;
-    content: string;
-    createdAt: Timestamp;
+  id: string;
+  authorId: string;
+  content: string;
+  createdAt: Timestamp;
 }
 
 export type Like = {
-    id: string; // The user's UID
-    userId: string;
-    createdAt: Timestamp;
+  id: string; // The user's UID
+  userId: string;
+  createdAt: Timestamp;
 }
 
 export type Service = {
-  id:string;
+  id: string;
   name: string;
   category: string;
   description: string;
