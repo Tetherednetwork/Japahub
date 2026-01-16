@@ -6,4 +6,14 @@ runConfig:
   # more instances in response to increased traffic.
   maxInstances: 1
 
+env:
+  - variable: GOOGLE_PLACES_API_KEY
+    secret: GOOGLE_PLACES_API_KEY
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+  - variable: NEWS_API_KEY
+    secret: NEWS_API_KEY
+  - variable: GNEWS_API_KEY
+    secret: GNEWS_API_KEY
+
 
