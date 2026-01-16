@@ -48,7 +48,7 @@ const fetchNewsFromGNews = ai.defineTool(
         const apiKey = process.env.GNEWS_API_KEY;
         if (!apiKey) {
             console.error('GNEWS_API_KEY environment variable not set.');
-            return []; // Return empty array instead of throwing to prevent UI crash
+            throw new Error('GNews API Key is missing on server.');
         }
 
         const url = 'https://gnews.io/api/v4/top-headlines';
@@ -67,17 +67,16 @@ const fetchNewsFromGNews = ai.defineTool(
             const response = await fetch(`${url}?${params.toString()}`);
             if (!response.ok) {
                 const errorBody = await response.text();
-                console.error(`GNews API request failed: ${response.status} ${errorBody}`);
-                return [];
+                throw new Error(`GNews API Error (${response.status}): ${errorBody}`);
             }
             const data: any = await response.json();
 
-            // Filter and map articles to our schema, ensuring all required fields are present and valid
+            // Filter and map articles
             const validArticles = (data.articles || [])
                 .map((article: any) => {
                     return {
                         title: article.title,
-                        description: article.description || '', // Ensure strings
+                        description: article.description || '',
                         content: article.content || '',
                         url: article.url,
                         image: article.image || '',
@@ -88,16 +87,13 @@ const fetchNewsFromGNews = ai.defineTool(
                         }
                     };
                 })
-                .filter((article: any) => {
-                    // Basic validation manually since zod might be too strict on empty strings
-                    return article.title && article.url;
-                });
+                .filter((article: any) => article.title && article.url);
 
             return validArticles;
 
         } catch (error) {
             console.error('Error fetching news from GNews API:', error);
-            return [];
+            throw error;
         }
     }
 );
@@ -106,13 +102,22 @@ const fetchNewsFlow = ai.defineFlow(
     {
         name: 'fetchNewsFlow',
         inputSchema: FetchNewsInputSchema,
-        outputSchema: FetchNewsOutputSchema,
+        outputSchema: z.object({
+            articles: z.array(ArticleSchema),
+            error: z.string().optional()
+        }),
     },
     async (input) => {
-        return fetchNewsFromGNews(input);
+        try {
+            const articles = await fetchNewsFromGNews(input);
+            return { articles };
+        } catch (e: any) {
+            console.error("News fetch error:", e);
+            return { articles: [], error: e.message || "Unknown error fetching news" };
+        }
     }
 );
 
-export async function fetchNews(input: FetchNewsInput): Promise<FetchNewsOutput> {
+export async function fetchNews(input: FetchNewsInput): Promise<{ articles: Article[], error?: string }> {
     return fetchNewsFlow({ ...input, language: input.language ?? 'en' });
 }

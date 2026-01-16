@@ -165,14 +165,20 @@ export default function ServiceDirectoryPage() {
     setHasSearched(true);
     setError(null);
     try {
-      const results = await searchLocalDirectory({
+      const { places, error: searchError } = await searchLocalDirectory({
         query: searchQuery,
         location: location,
       });
-      setServices(results);
+      if (searchError) {
+        setError(searchError);
+        setServices([]);
+      } else {
+        setServices(places);
+      }
     } catch (e: any) {
       console.error(e);
-      setError('Failed to search for services. Please ensure your Google Places API key is configured correctly.');
+      setError('Failed to search for services.');
+      setServices([]);
     } finally {
       setIsLoading(false);
     }

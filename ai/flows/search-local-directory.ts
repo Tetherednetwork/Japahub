@@ -49,7 +49,7 @@ const findPlacesTool = ai.defineTool(
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) {
       console.error('GOOGLE_PLACES_API_KEY environment variable not set.');
-      return []; // Prevent crash
+      throw new Error('Google Places API Key is missing on server.');
     }
 
     const fullQuery = `${query} in ${location}`;
@@ -71,8 +71,7 @@ const findPlacesTool = ai.defineTool(
 
       if (!response.ok) {
         const errorBody = await response.text();
-        console.error(`Google Places API request failed: ${response.status} ${errorBody}`);
-        return [];
+        throw new Error(`Google Places API Error (${response.status}): ${errorBody}`);
       }
 
       const data: any = await response.json();
@@ -107,7 +106,7 @@ const findPlacesTool = ai.defineTool(
 
     } catch (error) {
       console.error('Error calling Google Places API:', error);
-      return [];
+      throw error;
     }
   }
 );
@@ -117,15 +116,23 @@ const searchLocalDirectoryFlow = ai.defineFlow(
   {
     name: 'searchLocalDirectoryFlow',
     inputSchema: SearchLocalDirectoryInputSchema,
-    outputSchema: SearchLocalDirectoryOutputSchema,
+    outputSchema: z.object({
+      places: SearchLocalDirectoryOutputSchema,
+      error: z.string().optional()
+    }),
   },
   async (input) => {
-    // Directly call the tool. No complex prompting needed for this use case.
-    return findPlacesTool(input);
+    try {
+      const places = await findPlacesTool(input);
+      return { places };
+    } catch (e: any) {
+      console.error("Directory search error:", e);
+      return { places: [], error: e.message || "Unknown error searching directory" };
+    }
   }
 );
 
 // Export a callable function that wraps the flow
-export async function searchLocalDirectory(input: SearchLocalDirectoryInput): Promise<SearchLocalDirectoryOutput> {
+export async function searchLocalDirectory(input: SearchLocalDirectoryInput): Promise<{ places: SearchLocalDirectoryOutput, error?: string }> {
   return searchLocalDirectoryFlow(input);
 }

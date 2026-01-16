@@ -149,10 +149,15 @@ export default function NewsPage() {
         setIsLoading(true);
         setError(null);
         try {
-            const fetchedArticles = await fetchNews(input);
-            setArticles(fetchedArticles);
+            const { articles: fetchedArticles, error: fetchError } = await fetchNews(input);
+            if (fetchError) {
+                setError(fetchError);
+                setArticles([]);
+            } else {
+                setArticles(fetchedArticles);
+            }
         } catch (err: any) {
-            setError(err.message || 'Failed to fetch news. Please try again later.');
+            setError(err.message || 'Failed to fetch news.');
             setArticles([]);
         } finally {
             setIsLoading(false);
