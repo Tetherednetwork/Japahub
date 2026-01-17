@@ -18,6 +18,7 @@ async function performDiagnostics() {
             google: { status: 'pending', code: 0, time: 0 },
             nominatim: { status: 'pending', code: 0, time: 0 },
             gnews_rss: { status: 'pending', code: 0, time: 0 },
+            gnews_api: { status: 'pending', code: 0, time: 0 },
         }
     };
 
