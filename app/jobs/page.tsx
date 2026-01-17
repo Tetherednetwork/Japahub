@@ -107,11 +107,17 @@ export default function JobsPage() {
         setJobs([]);
 
         try {
-            const results = await searchLocalDirectory({
+            const { places, error: searchError } = await searchLocalDirectory({
                 query: searchQuery,
                 location: location,
             });
-            setJobs(results);
+
+            if (searchError) {
+                console.error("Jobs search error:", searchError);
+                setError(searchError);
+            } else {
+                setJobs(places);
+            }
         } catch (e: any) {
             console.error(e);
             setError('Failed to search for jobs. Please try again.');
