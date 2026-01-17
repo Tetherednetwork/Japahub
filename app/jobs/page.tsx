@@ -1,4 +1,4 @@
-'use server';
+'use client';
 
 import { Briefcase, Frown, Loader2, MapPin, Search, Star, Phone, Globe, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
