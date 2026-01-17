@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 function JobCard({ job }: { job: Service }) {
     const googleMapsUrl = job.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}` : null;
@@ -95,6 +96,8 @@ export default function JobsPage() {
     const [industry, setIndustry] = useState('all');
     const [jobType, setJobType] = useState('all');
     const [isDeepSearch, setIsDeepSearch] = useState(false);
+    const [visa, setVisa] = useState(false);
+    const [noExp, setNoExp] = useState(false);
 
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
@@ -118,7 +121,7 @@ export default function JobsPage() {
             let finalQuery = searchQuery;
 
             // If query is empty but filters are set, create a general query
-            if (!finalQuery && (industry !== 'all' || jobType !== 'all')) {
+            if (!finalQuery && (industry !== 'all' || jobType !== 'all' || visa || noExp)) {
                 finalQuery = "Jobs";
             } else if (!finalQuery) {
                 // If everything is empty (initial state), do nothing
@@ -131,6 +134,14 @@ export default function JobsPage() {
             }
             if (industry !== 'all') {
                 finalQuery = `${finalQuery} in ${industry}`;
+            }
+
+            // Specialized Filters
+            if (visa) {
+                finalQuery = `${finalQuery} (Visa Sponsorship OR Tier 2 Sponsorship)`;
+            }
+            if (noExp) {
+                finalQuery = `${finalQuery} (Entry Level OR No Experience OR Junior)`;
             }
 
             // For Deep Search, we append keywords that trigger "hiring" intent in Directory searches
@@ -195,12 +206,12 @@ export default function JobsPage() {
                     </div>
 
                     {/* Filters Row */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-center bg-muted/30 p-3 rounded-md border border-dashed">
-                        <div className="flex-1 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-4 items-center bg-muted/30 p-4 rounded-md border border-dashed">
+                        <div className="w-full sm:w-40">
                             <Label className="text-xs mb-1.5 block text-muted-foreground">Industry</Label>
                             <Select value={industry} onValueChange={setIndustry}>
                                 <SelectTrigger className="w-full bg-background h-9">
-                                    <SelectValue placeholder="All Industries" />
+                                    <SelectValue placeholder="All" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Industries</SelectItem>
@@ -210,16 +221,16 @@ export default function JobsPage() {
                                     <SelectItem value="Construction">Construction</SelectItem>
                                     <SelectItem value="Education">Education</SelectItem>
                                     <SelectItem value="Retail">Retail</SelectItem>
-                                    <SelectItem value="Hopsitality">Hospitality</SelectItem>
+                                    <SelectItem value="Hospitality">Hospitality</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        <div className="flex-1 w-full sm:w-auto">
+                        <div className="w-full sm:w-40">
                             <Label className="text-xs mb-1.5 block text-muted-foreground">Job Type</Label>
                             <Select value={jobType} onValueChange={setJobType}>
                                 <SelectTrigger className="w-full bg-background h-9">
-                                    <SelectValue placeholder="All Types" />
+                                    <SelectValue placeholder="All" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Types</SelectItem>
@@ -231,7 +242,18 @@ export default function JobsPage() {
                             </Select>
                         </div>
 
-                        <div className="flex items-center gap-2 pt-4 sm:pt-0">
+                        {/* Special Filters */}
+                        <div className="flex items-center gap-2 pt-5">
+                            <Checkbox id="visa" checked={visa} onCheckedChange={(c) => setVisa(!!c)} />
+                            <Label htmlFor="visa" className="cursor-pointer font-medium text-sm">Visa Sponsorship</Label>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-5">
+                            <Checkbox id="no-exp" checked={noExp} onCheckedChange={(c) => setNoExp(!!c)} />
+                            <Label htmlFor="no-exp" className="cursor-pointer font-medium text-sm">No Experience</Label>
+                        </div>
+
+                        <div className="ml-auto flex items-center gap-2 pt-5 sm:border-l sm:pl-4">
                             <Switch id="deep-search" checked={isDeepSearch} onCheckedChange={setIsDeepSearch} />
                             <div className="flex flex-col">
                                 <Label htmlFor="deep-search" className="cursor-pointer font-medium">Deep Search</Label>
@@ -262,7 +284,7 @@ export default function JobsPage() {
                     <h2 className="mt-4 text-xl font-semibold">No Results Found</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
                         Your search for "{searchQuery}" in {location} did not return any results. <br />
-                        Try enabling "Deep Search" or changing your filters.
+                        Try adjusting your filters or enabling "Deep Search".
                     </p>
                 </div>
             )}
