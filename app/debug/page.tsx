@@ -11,6 +11,8 @@ async function performDiagnostics() {
         env: {
             gnews: !!process.env.GNEWS_API_KEY,
             gnews_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.length : 0,
+            gnews_preview: process.env.GNEWS_API_KEY ? `${process.env.GNEWS_API_KEY.substring(0, 3)}...${process.env.GNEWS_API_KEY.substring(process.env.GNEWS_API_KEY.length - 3)}` : 'N/A',
+            gnews_quoted: process.env.GNEWS_API_KEY ? (process.env.GNEWS_API_KEY.startsWith('"') || process.env.GNEWS_API_KEY.endsWith('"')) : false,
             places: !!process.env.GOOGLE_PLACES_API_KEY,
             places_len: process.env.GOOGLE_PLACES_API_KEY ? process.env.GOOGLE_PLACES_API_KEY.length : 0,
         },
@@ -93,9 +95,13 @@ export default async function DebugPage() {
                     <CardContent className="space-y-4 pt-4">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium">GNEWS_API_KEY</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground">Len: {data.env.gnews_len}</span>
-                                {data.env.gnews ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                            <div className="flex flex-col items-end gap-1">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-mono bg-muted px-1 rounded">{data.env.gnews_preview}</span>
+                                    {data.env.gnews ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                                </div>
+                                {data.env.gnews_quoted && <span className="text-xs text-red-500 font-bold">WARNING: Remove quotes!</span>}
+                                {data.env.gnews_len > 0 && data.env.gnews_len !== 32 && <span className="text-xs text-yellow-500">Length Warn: {data.env.gnews_len} (Exp: ~32)</span>}
                             </div>
                         </div>
                         <div className="flex items-center justify-between">

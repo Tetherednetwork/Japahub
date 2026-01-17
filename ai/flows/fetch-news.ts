@@ -132,15 +132,14 @@ const fetchNewsTool = ai.defineTool(
                 console.log(`[fetchNews] GNews returned ${articles.length} articles.`);
                 return articles;
             }
-            console.log('[fetchNews] GNews returned 0 articles.');
+            console.log('[fetchNews] GNews returned 0 articles. Switching to RSS.');
             return []; // Return empty instead of falling back
         } catch (e: any) {
-            console.error('[fetchNews] GNews failed.', e);
-            // Re-throw the specific error to be seen by the UI
-            throw new Error(`GNews API Error: ${e.message}`);
+            console.warn(`[fetchNews] GNews failed (${e.message}). Switching to RSS.`);
+            // Do NOT throw, allow fallback to proceed
         }
 
-        /* RSS Fallback Disabled
+        // RSS Fallback - Re-enabled for Robustness
         try {
             const rssArticles = await fetchFromRSS(input);
             console.log(`[fetchNews] RSS returned ${rssArticles.length} articles.`);
@@ -148,8 +147,7 @@ const fetchNewsTool = ai.defineTool(
         } catch (e) {
             console.error('[fetchNews] Both strategies failed.', e);
             throw new Error('Unable to fetch news from any source.');
-        } 
-        */
+        }
     }
 );
 
