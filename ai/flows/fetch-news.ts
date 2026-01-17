@@ -89,18 +89,30 @@ async function fetchFromRSS(input: FetchNewsInput): Promise<Article[]> {
     console.log(`[RSS Fallback] Fetching: ${feedUrl}`);
     const feed = await parser.parseURL(feedUrl);
 
-    return (feed.items || []).map((item) => ({
-        title: item.title || 'Untitled',
-        description: item.contentSnippet || item.content || '',
-        content: item.content || item.contentSnippet || '',
-        url: item.link || '',
-        image: 'https://placehold.co/600x400/e2e8f0/1e293b?text=News', // RSS rarely has images
-        publishedAt: item.isoDate || new Date().toISOString(),
-        source: {
-            name: item.source || 'Google News',
-            url: item.link || '',
+    return (feed.items || []).map((item) => {
+        // Try to find an image in content or description
+        let image = 'https://placehold.co/600x400/e2e8f0/1e293b?text=News';
+        const content = item.content || item.contentSnippet || item.description || '';
+
+        // Regex to extract img src
+        const imgMatch = content.match(/<img[^>]+src="([^">]+)"/);
+        if (imgMatch && imgMatch[1]) {
+            image = imgMatch[1];
         }
-    })).slice(0, 10);
+
+        return {
+            title: item.title || 'Untitled',
+            description: item.contentSnippet || item.content || '',
+            content: item.content || item.contentSnippet || '',
+            url: item.link || '',
+            image: image,
+            publishedAt: item.isoDate || new Date().toISOString(),
+            source: {
+                name: item.source || 'Google News',
+                url: item.link || '',
+            }
+        };
+    }).slice(0, 10);
 }
 
 // --- Main Tool ---
