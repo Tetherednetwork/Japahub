@@ -75,7 +75,7 @@ export default async function DebugPage() {
         <div className="container mx-auto py-10 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">System Diagnostics</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">System Diagnostics <Badge variant="outline" className="ml-2 text-lg">v2.0-GNEWS-TEST</Badge></h1>
                     <p className="text-muted-foreground">Server-side environment and connectivity checks.</p>
                 </div>
                 <Badge variant={data.env.gnews && data.env.places ? 'default' : 'destructive'}>
