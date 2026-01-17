@@ -1,6 +1,6 @@
+'use server';
 
-'use client';
-import { Briefcase, Frown, Loader2, MapPin, Search, Star, Phone, Globe } from 'lucide-react';
+import { Briefcase, Frown, Loader2, MapPin, Search, Star, Phone, Globe, Filter } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
@@ -12,6 +12,9 @@ import { searchLocalDirectory } from '@/ai/flows/search-local-directory';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 function JobCard({ job }: { job: Service }) {
     const googleMapsUrl = job.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}` : null;
@@ -87,6 +90,12 @@ export default function JobsPage() {
     const [jobs, setJobs] = useState<Service[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [location, setLocation] = useState('');
+
+    // Filters
+    const [industry, setIndustry] = useState('all');
+    const [jobType, setJobType] = useState('all');
+    const [isDeepSearch, setIsDeepSearch] = useState(false);
+
     const [isLoading, setIsLoading] = useState(false);
     const [hasSearched, setHasSearched] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -99,16 +108,40 @@ export default function JobsPage() {
     }, [userProfile]);
 
     const handleSearch = async () => {
-        if (!searchQuery) return;
-
         setIsLoading(true);
         setHasSearched(true);
         setError(null);
         setJobs([]);
 
         try {
+            // Construct Advanced Query
+            let finalQuery = searchQuery;
+
+            // If query is empty but filters are set, create a general query
+            if (!finalQuery && (industry !== 'all' || jobType !== 'all')) {
+                finalQuery = "Jobs";
+            } else if (!finalQuery) {
+                // If everything is empty (initial state), do nothing
+                setIsLoading(false);
+                return;
+            }
+
+            if (jobType !== 'all') {
+                finalQuery = `${jobType} ${finalQuery}`;
+            }
+            if (industry !== 'all') {
+                finalQuery = `${finalQuery} in ${industry}`;
+            }
+
+            // For Deep Search, we append keywords that trigger "hiring" intent in Directory searches
+            if (isDeepSearch) {
+                finalQuery = `${finalQuery} (Recruitment OR Hiring OR Careers)`;
+            }
+
+            console.log("Searching Jobs with Query:", finalQuery);
+
             const { places, error: searchError } = await searchLocalDirectory({
-                query: searchQuery,
+                query: finalQuery,
                 location: location,
             });
 
@@ -131,31 +164,81 @@ export default function JobsPage() {
             <div className="bg-card p-6 rounded-lg border">
                 <h1 className="text-3xl font-bold">Local Job Listings</h1>
                 <p className="text-muted-foreground">Find local companies and potential job opportunities.</p>
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search by role or company..."
-                            className="pl-10"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        />
+
+                <div className="mt-6 flex flex-col gap-4">
+                    {/* Main Search Bar */}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by role (e.g. Nurse, Driver)..."
+                                className="pl-10"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            />
+                        </div>
+                        <div className="relative flex-1">
+                            <MapPin className="absolute left-3.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Location (e.g. London, UK)..."
+                                className="pl-10"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            />
+                        </div>
+                        <Button onClick={handleSearch} disabled={isLoading}>
+                            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                            Search
+                        </Button>
                     </div>
-                    <div className="relative flex-1">
-                        <MapPin className="absolute left-3.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="e.g., London, UK"
-                            className="pl-10"
-                            value={location}
-                            onChange={(e) => setLocation(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                        />
+
+                    {/* Filters Row */}
+                    <div className="flex flex-col sm:flex-row gap-4 items-center bg-muted/30 p-3 rounded-md border border-dashed">
+                        <div className="flex-1 w-full sm:w-auto">
+                            <Label className="text-xs mb-1.5 block text-muted-foreground">Industry</Label>
+                            <Select value={industry} onValueChange={setIndustry}>
+                                <SelectTrigger className="w-full bg-background h-9">
+                                    <SelectValue placeholder="All Industries" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Industries</SelectItem>
+                                    <SelectItem value="Healthcare">Healthcare</SelectItem>
+                                    <SelectItem value="Technology">Technology</SelectItem>
+                                    <SelectItem value="Finance">Finance</SelectItem>
+                                    <SelectItem value="Construction">Construction</SelectItem>
+                                    <SelectItem value="Education">Education</SelectItem>
+                                    <SelectItem value="Retail">Retail</SelectItem>
+                                    <SelectItem value="Hopsitality">Hospitality</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="flex-1 w-full sm:w-auto">
+                            <Label className="text-xs mb-1.5 block text-muted-foreground">Job Type</Label>
+                            <Select value={jobType} onValueChange={setJobType}>
+                                <SelectTrigger className="w-full bg-background h-9">
+                                    <SelectValue placeholder="All Types" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Types</SelectItem>
+                                    <SelectItem value="Full-time">Full-time</SelectItem>
+                                    <SelectItem value="Part-time">Part-time</SelectItem>
+                                    <SelectItem value="Contract">Contract</SelectItem>
+                                    <SelectItem value="Internship">Internship</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-4 sm:pt-0">
+                            <Switch id="deep-search" checked={isDeepSearch} onCheckedChange={setIsDeepSearch} />
+                            <div className="flex flex-col">
+                                <Label htmlFor="deep-search" className="cursor-pointer font-medium">Deep Search</Label>
+                                <span className="text-[10px] text-muted-foreground">Include recruitment agencies</span>
+                            </div>
+                        </div>
                     </div>
-                    <Button onClick={handleSearch} disabled={!searchQuery || !location || isLoading}>
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                        Search
-                    </Button>
                 </div>
             </div>
 
@@ -178,7 +261,8 @@ export default function JobsPage() {
                     <Frown className="w-12 h-12 text-muted-foreground" />
                     <h2 className="mt-4 text-xl font-semibold">No Results Found</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Your search for "{searchQuery}" in {location} did not return any results.
+                        Your search for "{searchQuery}" in {location} did not return any results. <br />
+                        Try enabling "Deep Search" or changing your filters.
                     </p>
                 </div>
             )}
@@ -188,7 +272,7 @@ export default function JobsPage() {
                     <Briefcase className="w-12 h-12 text-muted-foreground" />
                     <h2 className="mt-4 text-xl font-semibold">Find Your Next Role</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                        Use the search bar above to find local companies and opportunities.
+                        Use the search bar and filters above to find local companies and opportunities.
                     </p>
                 </div>
             )}
