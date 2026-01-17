@@ -2,7 +2,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-// import fetch from 'node-fetch'; // Removed to use native global fetch
+import Parser from 'rss-parser';
 
 // Define schemas
 const FetchNewsInputSchema = z.object({
@@ -29,75 +29,110 @@ const ArticleSchema = z.object({
 
 export type Article = z.infer<typeof ArticleSchema>;
 
-const FetchNewsOutputSchema = z.array(ArticleSchema);
-export type FetchNewsOutput = z.infer<typeof FetchNewsOutputSchema>;
+// Tools
+const parser = new Parser();
 
+// --- 1. GNews Strategy ---
+async function fetchFromGNews(input: FetchNewsInput): Promise<Article[]> {
+    const apiKey = process.env.GNEWS_API_KEY;
+    if (!apiKey) throw new Error('GNews API Key missing');
 
-const fetchNewsFromGNews = ai.defineTool(
+    const url = 'https://gnews.io/api/v4/top-headlines';
+    const params = new URLSearchParams({
+        apikey: apiKey,
+        lang: input.language || 'en',
+    });
+
+    if (input.query) params.append('q', input.query);
+    if (input.country) params.append('country', input.country);
+    if (input.category && ['general', 'world', 'nation', 'business', 'technology', 'entertainment', 'sports', 'science', 'health', 'politics'].includes(input.category)) {
+        params.append('topic', input.category);
+    }
+
+    const response = await fetch(`${url}?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error(`GNews returned ${response.status}`);
+    }
+
+    const data: any = await response.json();
+    return (data.articles || [])
+        .map((article: any) => ({
+            title: article.title,
+            description: article.description || '',
+            content: article.content || '',
+            url: article.url,
+            image: article.image || '',
+            publishedAt: article.publishedAt,
+            source: {
+                name: article.source.name,
+                url: article.source.url,
+            }
+        }))
+        .filter((a: Article) => a.title && a.url);
+}
+
+// --- 2. RSS Fallback Strategy ---
+async function fetchFromRSS(input: FetchNewsInput): Promise<Article[]> {
+    const lang = input.language || 'en';
+    const country = (input.country || 'gb').toUpperCase();
+    const ceid = `${country}:${lang}`;
+    let feedUrl = 'https://news.google.com/rss';
+
+    if (input.query) {
+        feedUrl = `${feedUrl}/search?q=${encodeURIComponent(input.query + (input.category ? ` ${input.category}` : ''))}&hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    } else if (input.category) {
+        feedUrl = `${feedUrl}/search?q=${encodeURIComponent(input.category)}&hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    } else {
+        feedUrl = `${feedUrl}?hl=${lang}-${country}&gl=${country}&ceid=${ceid}`;
+    }
+
+    console.log(`[RSS Fallback] Fetching: ${feedUrl}`);
+    const feed = await parser.parseURL(feedUrl);
+
+    return (feed.items || []).map((item) => ({
+        title: item.title || 'Untitled',
+        description: item.contentSnippet || item.content || '',
+        content: item.content || item.contentSnippet || '',
+        url: item.link || '',
+        image: 'https://placehold.co/600x400/e2e8f0/1e293b?text=News', // RSS rarely has images
+        publishedAt: item.isoDate || new Date().toISOString(),
+        source: {
+            name: item.source || 'Google News',
+            url: item.link || '',
+        }
+    })).slice(0, 10);
+}
+
+// --- Main Tool ---
+const fetchNewsTool = ai.defineTool(
     {
-        name: 'fetchNewsFromGNews',
-        description: 'Fetches top headlines or searches for news articles using the GNews API.',
+        name: 'fetchNews',
+        description: 'Fetches news using GNews with a robust RSS fallback.',
         inputSchema: FetchNewsInputSchema,
-        outputSchema: FetchNewsOutputSchema,
+        outputSchema: z.array(ArticleSchema),
     },
     async (input) => {
-        const apiKey = process.env.GNEWS_API_KEY;
-        console.log(`[fetchNews] Using API Key (length): ${apiKey ? apiKey.length : 0}`);
-
-        if (!apiKey) {
-            console.error('GNEWS_API_KEY environment variable not set.');
-            throw new Error('GNews API Key is missing on server.');
-        }
-
-        const url = 'https://gnews.io/api/v4/top-headlines';
-        const params = new URLSearchParams({
-            apikey: apiKey,
-            lang: input.language || 'en',
-        });
-
-        if (input.query) params.append('q', input.query);
-        if (input.country) params.append('country', input.country);
-        if (input.category && ['general', 'world', 'nation', 'business', 'technology', 'entertainment', 'sports', 'science', 'health', 'politics'].includes(input.category)) {
-            params.append('topic', input.category);
-        }
-
-        const requestUrl = `${url}?${params.toString()}`;
-        console.log(`[fetchNews] Requesting URL (sans key): ${requestUrl.replace(apiKey, 'REDACTED')}`);
-
         try {
-            const response = await fetch(requestUrl);
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                console.error(`[fetchNews] API Error ${response.status}: ${errorBody}`);
-                throw new Error(`GNews API Error (${response.status}): ${errorBody}`);
+            // Try GNews first
+            console.log('[fetchNews] Attempting GNews...');
+            const articles = await fetchFromGNews(input);
+            if (articles.length > 0) {
+                console.log(`[fetchNews] GNews returned ${articles.length} articles.`);
+                return articles;
             }
+            console.log('[fetchNews] GNews returned 0 articles. Switching to RSS.');
+        } catch (e) {
+            console.warn('[fetchNews] GNews failed. Switching to RSS.', e);
+        }
 
-            const data: any = await response.json();
-
-            // Filter and map articles
-            const validArticles = (data.articles || [])
-                .map((article: any) => {
-                    return {
-                        title: article.title,
-                        description: article.description || '',
-                        content: article.content || '',
-                        url: article.url,
-                        image: article.image || '',
-                        publishedAt: article.publishedAt,
-                        source: {
-                            name: article.source.name,
-                            url: article.source.url,
-                        }
-                    };
-                })
-                .filter((article: any) => article.title && article.url);
-
-            return validArticles;
-
-        } catch (error) {
-            console.error('[fetchNews] Network/Code Error:', error);
-            throw error;
+        // Fallback to RSS
+        try {
+            const rssArticles = await fetchFromRSS(input);
+            console.log(`[fetchNews] RSS returned ${rssArticles.length} articles.`);
+            return rssArticles;
+        } catch (e) {
+            console.error('[fetchNews] Both strategies failed.', e);
+            throw new Error('Unable to fetch news from any source.');
         }
     }
 );
@@ -113,10 +148,9 @@ const fetchNewsFlow = ai.defineFlow(
     },
     async (input) => {
         try {
-            const articles = await fetchNewsFromGNews(input);
+            const articles = await fetchNewsTool(input);
             return { articles };
         } catch (e: any) {
-            console.error("News fetch flow error:", e);
             return { articles: [], error: e.message || "Unknown error fetching news" };
         }
     }
