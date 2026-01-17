@@ -124,20 +124,23 @@ const fetchNewsTool = ai.defineTool(
         outputSchema: z.array(ArticleSchema),
     },
     async (input) => {
+        // Try GNews (Exclusive Mode - RSS Fallback Disabled by User Request)
+        console.log('[fetchNews] Attempting GNews...');
         try {
-            // Try GNews first
-            console.log('[fetchNews] Attempting GNews...');
             const articles = await fetchFromGNews(input);
             if (articles.length > 0) {
                 console.log(`[fetchNews] GNews returned ${articles.length} articles.`);
                 return articles;
             }
-            console.log('[fetchNews] GNews returned 0 articles. Switching to RSS.');
-        } catch (e) {
-            console.warn('[fetchNews] GNews failed. Switching to RSS.', e);
+            console.log('[fetchNews] GNews returned 0 articles.');
+            return []; // Return empty instead of falling back
+        } catch (e: any) {
+            console.error('[fetchNews] GNews failed.', e);
+            // Re-throw the specific error to be seen by the UI
+            throw new Error(`GNews API Error: ${e.message}`);
         }
 
-        // Fallback to RSS
+        /* RSS Fallback Disabled
         try {
             const rssArticles = await fetchFromRSS(input);
             console.log(`[fetchNews] RSS returned ${rssArticles.length} articles.`);
@@ -145,7 +148,8 @@ const fetchNewsTool = ai.defineTool(
         } catch (e) {
             console.error('[fetchNews] Both strategies failed.', e);
             throw new Error('Unable to fetch news from any source.');
-        }
+        } 
+        */
     }
 );
 

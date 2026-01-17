@@ -51,6 +51,20 @@ async function performDiagnostics() {
         results.connectivity.gnews_rss = { status: 'failed', code: 0, time: 0 };
     }
 
+    // Check GNews API (Real Test)
+    try {
+        const start = Date.now();
+        const apiKey = process.env.GNEWS_API_KEY;
+        if (apiKey) {
+            const res = await fetch(`https://gnews.io/api/v4/top-headlines?apikey=${apiKey}&lang=en&max=1`, { method: 'GET' });
+            results.connectivity.gnews_api = { status: res.ok ? 'ok' : 'error', code: res.status, time: Date.now() - start };
+        } else {
+            results.connectivity.gnews_api = { status: 'missing_key', code: 0, time: 0 };
+        }
+    } catch (e: any) {
+        results.connectivity.gnews_api = { status: 'failed', code: 0, time: 0 };
+    }
+
     return results;
 }
 
@@ -118,6 +132,15 @@ export default async function DebugPage() {
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-muted-foreground">{data.connectivity.gnews_rss.time}ms</span>
                                 <Badge variant={data.connectivity.gnews_rss.status === 'ok' ? 'outline' : 'destructive'}>{data.connectivity.gnews_rss.status.toUpperCase()} ({data.connectivity.gnews_rss.code})</Badge>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium flex items-center gap-2"><Globe className="h-3 w-3" /> GNews API (Real Test)</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-muted-foreground">{data.connectivity.gnews_api?.time || 0}ms</span>
+                                <Badge variant={data.connectivity.gnews_api?.status === 'ok' ? 'outline' : 'destructive'}>
+                                    {data.connectivity.gnews_api?.status.toUpperCase()} ({data.connectivity.gnews_api?.code})
+                                </Badge>
                             </div>
                         </div>
                     </CardContent>
