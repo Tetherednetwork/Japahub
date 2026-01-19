@@ -11,9 +11,11 @@ async function performDiagnostics() {
         env: {
             gnews: !!process.env.GNEWS_API_KEY,
             gnews_raw_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.length : 0,
-            gnews_sanitized_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim().length : 0,
+            gnews_sanitized_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/[^a-zA-Z0-9]/g, '').length : 0,
             gnews_preview: process.env.GNEWS_API_KEY ? `${process.env.GNEWS_API_KEY.substring(0, 3)}...${process.env.GNEWS_API_KEY.substring(process.env.GNEWS_API_KEY.length - 3)}` : 'N/A',
+            gnews_char_codes: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.split('').slice(-5).map(c => c.charCodeAt(0)).join(',') : 'N/A',
             gnews_has_quotes: process.env.GNEWS_API_KEY ? (process.env.GNEWS_API_KEY.includes('"') || process.env.GNEWS_API_KEY.includes("'")) : false,
+            gnews_has_newlines: process.env.GNEWS_API_KEY ? (process.env.GNEWS_API_KEY.includes('\\n') || process.env.GNEWS_API_KEY.includes('\\r')) : false,
             places: !!process.env.GOOGLE_PLACES_API_KEY,
             places_len: process.env.GOOGLE_PLACES_API_KEY ? process.env.GOOGLE_PLACES_API_KEY.length : 0,
         },
@@ -58,7 +60,7 @@ async function performDiagnostics() {
     // Check GNews API (Real Test)
     try {
         const start = Date.now();
-        const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim() : '';
+        const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/[^a-zA-Z0-9]/g, '') : '';
         if (apiKey) {
             const res = await fetch(`https://gnews.io/api/v4/top-headlines?apikey=${apiKey}&lang=en&max=1`, { method: 'GET' });
             results.connectivity.gnews_api = { status: res.ok ? 'ok' : 'error', code: res.status, time: Date.now() - start };
@@ -79,7 +81,7 @@ export default async function DebugPage() {
         <div className="container mx-auto py-10 space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">System Diagnostics <Badge variant="outline" className="ml-2 text-lg">v2.0-GNEWS-TEST</Badge></h1>
+                    <h1 className="text-3xl font-bold tracking-tight">System Diagnostics <Badge variant="outline" className="ml-2 text-lg">v2.2-CHAR-CODE</Badge></h1>
                     <p className="text-muted-foreground">Server-side environment and connectivity checks.</p>
                 </div>
                 <Badge variant={data.env.gnews && data.env.places ? 'default' : 'destructive'}>
@@ -102,7 +104,9 @@ export default async function DebugPage() {
                                     {data.env.gnews ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                                 </div>
                                 {data.env.gnews_has_quotes && <span className="text-xs text-green-600 font-bold">Quotes Detected (Auto-Fixed)</span>}
-                                {data.env.gnews_sanitized_len > 0 && data.env.gnews_sanitized_len !== 32 && <span className="text-xs text-yellow-500">Length Warn: {data.env.gnews_sanitized_len} (Exp: ~32)</span>}
+                                {data.env.gnews_has_newlines && <span className="text-xs text-green-600 font-bold">Newlines Detected (Auto-Fixed)</span>}
+                                {data.env.gnews_sanitized_len > 0 && data.env.gnews_sanitized_len !== 32 && <span className="text-xs text-yellow-500">Len: {data.env.gnews_sanitized_len} (Exp:32)</span>}
+                                <span className="text-[10px] text-muted-foreground font-mono">Last 5 ASCII: [{data.env.gnews_char_codes}]</span>
                             </div>
                         </div>
                         <div className="flex items-center justify-between">

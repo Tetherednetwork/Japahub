@@ -34,8 +34,9 @@ const parser = new Parser();
 
 // --- 1. GNews Strategy ---
 async function fetchFromGNews(input: FetchNewsInput): Promise<Article[]> {
-    // Resilience: Strip quotes and whitespace in case of bad env config
-    const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim() : '';
+    // Resilience: Aggressive allowlist - Only allow letters and numbers. 
+    // This strips quotes, backslashes, newlines (\n), and whitespace.
+    const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/[^a-zA-Z0-9]/g, '') : '';
     if (!apiKey) throw new Error('GNews API Key missing');
 
     const url = 'https://gnews.io/api/v4/top-headlines';
