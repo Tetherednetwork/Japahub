@@ -34,7 +34,8 @@ const parser = new Parser();
 
 // --- 1. GNews Strategy ---
 async function fetchFromGNews(input: FetchNewsInput): Promise<Article[]> {
-    const apiKey = process.env.GNEWS_API_KEY;
+    // Resilience: Strip quotes and whitespace in case of bad env config
+    const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim() : '';
     if (!apiKey) throw new Error('GNews API Key missing');
 
     const url = 'https://gnews.io/api/v4/top-headlines';

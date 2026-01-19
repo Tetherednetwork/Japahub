@@ -10,9 +10,10 @@ async function performDiagnostics() {
     const results = {
         env: {
             gnews: !!process.env.GNEWS_API_KEY,
-            gnews_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.length : 0,
+            gnews_raw_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.length : 0,
+            gnews_sanitized_len: process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim().length : 0,
             gnews_preview: process.env.GNEWS_API_KEY ? `${process.env.GNEWS_API_KEY.substring(0, 3)}...${process.env.GNEWS_API_KEY.substring(process.env.GNEWS_API_KEY.length - 3)}` : 'N/A',
-            gnews_quoted: process.env.GNEWS_API_KEY ? (process.env.GNEWS_API_KEY.startsWith('"') || process.env.GNEWS_API_KEY.endsWith('"')) : false,
+            gnews_has_quotes: process.env.GNEWS_API_KEY ? (process.env.GNEWS_API_KEY.includes('"') || process.env.GNEWS_API_KEY.includes("'")) : false,
             places: !!process.env.GOOGLE_PLACES_API_KEY,
             places_len: process.env.GOOGLE_PLACES_API_KEY ? process.env.GOOGLE_PLACES_API_KEY.length : 0,
         },
@@ -57,7 +58,7 @@ async function performDiagnostics() {
     // Check GNews API (Real Test)
     try {
         const start = Date.now();
-        const apiKey = process.env.GNEWS_API_KEY;
+        const apiKey = process.env.GNEWS_API_KEY ? process.env.GNEWS_API_KEY.replace(/['"]/g, '').trim() : '';
         if (apiKey) {
             const res = await fetch(`https://gnews.io/api/v4/top-headlines?apikey=${apiKey}&lang=en&max=1`, { method: 'GET' });
             results.connectivity.gnews_api = { status: res.ok ? 'ok' : 'error', code: res.status, time: Date.now() - start };
@@ -100,8 +101,8 @@ export default async function DebugPage() {
                                     <span className="text-xs font-mono bg-muted px-1 rounded">{data.env.gnews_preview}</span>
                                     {data.env.gnews ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                                 </div>
-                                {data.env.gnews_quoted && <span className="text-xs text-red-500 font-bold">WARNING: Remove quotes!</span>}
-                                {data.env.gnews_len > 0 && data.env.gnews_len !== 32 && <span className="text-xs text-yellow-500">Length Warn: {data.env.gnews_len} (Exp: ~32)</span>}
+                                {data.env.gnews_has_quotes && <span className="text-xs text-green-600 font-bold">Quotes Detected (Auto-Fixed)</span>}
+                                {data.env.gnews_sanitized_len > 0 && data.env.gnews_sanitized_len !== 32 && <span className="text-xs text-yellow-500">Length Warn: {data.env.gnews_sanitized_len} (Exp: ~32)</span>}
                             </div>
                         </div>
                         <div className="flex items-center justify-between">
